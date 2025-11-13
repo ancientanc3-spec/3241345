@@ -38,6 +38,18 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface StudentProfile {
+  id: string;
+  wallet_address: string;
+  full_name: string;
+  email: string;
+  institution_name: string;
+  institution_address: string;
+  enrollment_date: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const saveCredential = async (
   tokenId: string,
   studentAddress: string,
@@ -293,5 +305,120 @@ export const getInstitutionStats = async (
   } catch (error) {
     console.error('Error fetching institution stats:', error);
     return { totalIssued: 0, totalRevoked: 0, recentIssued: 0 };
+  }
+};
+
+export const getStudentProfile = async (
+  walletAddress: string
+): Promise<StudentProfile | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .select('*')
+      .eq('wallet_address', walletAddress)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching student profile:', error);
+    return null;
+  }
+};
+
+export const createStudentProfile = async (
+  walletAddress: string,
+  fullName: string,
+  email: string,
+  institutionName: string,
+  institutionAddress: string
+): Promise<StudentProfile | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .insert({
+        wallet_address: walletAddress,
+        full_name: fullName,
+        email,
+        institution_name: institutionName,
+        institution_address: institutionAddress,
+        enrollment_date: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating student profile:', error);
+    return null;
+  }
+};
+
+export const updateStudentProfile = async (
+  walletAddress: string,
+  updates: {
+    full_name?: string;
+    email?: string;
+    institution_name?: string;
+    institution_address?: string;
+  }
+): Promise<StudentProfile | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .update(updates)
+      .eq('wallet_address', walletAddress)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error updating student profile:', error);
+    return null;
+  }
+};
+
+export const getAuthorizedInstitutions = async (): Promise<Array<{ address: string; name: string }>> => {
+  try {
+    const { data, error } = await supabase
+      .from('credentials')
+      .select('institution_address, institution_name');
+
+    if (error) throw error;
+
+    const institutionMap = new Map<string, string>();
+    data?.forEach(cred => {
+      if (cred.institution_address && cred.institution_name) {
+        institutionMap.set(cred.institution_address, cred.institution_name);
+      }
+    });
+
+    return Array.from(institutionMap.entries()).map(([address, name]) => ({
+      address,
+      name
+    }));
+  } catch (error) {
+    console.error('Error fetching authorized institutions:', error);
+    return [];
+  }
+};
+
+export const getInstitutionStudents = async (
+  institutionAddress: string
+): Promise<StudentProfile[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .select('*')
+      .eq('institution_address', institutionAddress)
+      .order('enrollment_date', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching institution students:', error);
+    return [];
   }
 };
